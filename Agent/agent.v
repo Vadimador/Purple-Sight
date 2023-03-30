@@ -1,12 +1,4 @@
 
-//import os
-//<import>
-
-enum ResponseState as u8 {
-	success		// La commande à réussi
-	error		// La commande à échoué
-}
-
 enum ModuleState as u8 {
 	unknown		// inconnu
 	started		// le module est démarré mais n'a pas commencé
@@ -36,7 +28,7 @@ struct Commande {
 struct Response{
 	output string
 	index int // index de la commande dans la liste "commandes_list"
-	state ResponseState
+	exit_code int
 }
 
 struct SharedVariable {
@@ -48,10 +40,10 @@ struct SharedVariable {
 		Commande{command: "systeminfo", type_shell: ShellType.powershell, id: "id2"},
 	]
 mut:
-	execution_commande_list []Commande
+	execution_commande_list []int
 	ip []u8 = [u8(127),0,0,1]
 	response_list []Response
-	module_state []ModuleState = [ModuleState.unknown, ModuleState.unknown, ModuleState.unknown]
+	module_state shared []ModuleState = [ModuleState.unknown, ModuleState.unknown, ModuleState.unknown]
 }
 
 fn main(){
@@ -67,29 +59,46 @@ fn dump_shared_variable(sv &SharedVariable){
 		for c in sv.commandes_list	{
 			println("${c}")
 		}
-		println(sv.execution_commande_list)
+		println("	list d'execution : ${sv.execution_commande_list}")
 		println("	ip : ${sv.ip}")
 		println("	response_list : ${sv.response_list}")
-		println("	module state be like : ${sv.module_state}")
+		rlock sv.module_state {
+			println("	module state be like : ${sv.module_state}")
+		}
 }
 
 //code du <module d'écoute>
 fn (shared sv SharedVariable) module_ecoute(){
 	println("lancement des threads")
+	lock sv.module_state {
+		sv.module_state[Module.ecoute] = ModuleState.running
+	}
 
-	//tableau_module
+	// on remplis le tableau des commandes à exécuter
+	lock sv {
+		for i in 0 .. sv.commandes_list.len {
+			sv.execution_commande_list << i
+		}
+	}
+
 	m_execution := spawn sv.module_execution()
 	m_envoie := spawn sv.module_envoie()
 	m_execution.wait()
 	m_envoie.wait()
+
+	lock sv.module_state {
+		sv.module_state[Module.ecoute] = ModuleState.finish
+	}
 }
 
 // code du <module execution>
 fn (shared sv SharedVariable) module_execution() {
 	println("Thread module_execution")
-		
-	lock sv{
+	
+	rlock sv {
 		dump_shared_variable(sv)
+	}
+	lock sv.module_state {
 		sv.module_state[Module.execution] = ModuleState.finish
 	}
 }
