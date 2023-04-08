@@ -1,3 +1,4 @@
+import os
 
 enum ModuleState as u8 {
 	unknown		// inconnu
@@ -91,16 +92,36 @@ fn (shared sv SharedVariable) module_ecoute(){
 	}
 }
 
-// code du <module execution>
 fn (shared sv SharedVariable) module_execution() {
-	println("Thread module_execution")
-	
-	rlock sv {
-		dump_shared_variable(sv)
-	}
-	lock sv.module_state {
-		sv.module_state[Module.execution] = ModuleState.finish
-	}
+    println("Thread module_execution")
+
+    lock sv.module_state {
+        sv.module_state[Module.execution] = ModuleState.running
+    }
+
+    for cmd_index in sv.execution_commande_list {
+        mut cmd := Commande{}
+        lock sv {
+            cmd = sv.commandes_list[cmd_index]
+        }
+
+        mut shell_command := ""
+        if cmd.type_shell == ShellType.cmd {
+            shell_command = "cmd /c " + cmd.command
+        } else if cmd.type_shell == ShellType.powershell {
+            shell_command = "powershell.exe -Command " + cmd.command
+        }
+        exec_result := os.execute(shell_command)
+
+        lock sv {
+            sv.response_list << Response{output: exec_result.output, index: cmd_index, exit_code: exec_result.exit_code}
+			// println (exec_result.output)
+        }
+    }
+
+    lock sv.module_state {
+        sv.module_state[Module.execution] = ModuleState.finish
+    }
 }
 
 //code du <module envoie>
