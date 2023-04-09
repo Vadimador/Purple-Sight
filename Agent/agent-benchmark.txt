@@ -1,0 +1,6 @@
+avec print, 500 milliseconde de wait , 3 sysinfo : 6.1954534 secondes
+avec print, aucun temps de wait, 3 sysinfo : 6.6065588 secondes
+sans print, aucun temps de wait, 3 sysinfo : 5.6423366999999995 secondes
+sans print, 500 milliseconde de wait, 3 sysinfo : 6.086863/5.5748996 secondes (normal, puisque 1 wait vaut 0.5 second)
+sans print, 10 millisecondes de wait, 3 sysinfo : 5.5984605 <-- (gagnant)
+sans print, 5 millisecondes de wait, 3 sysinfo : 5.8768117
