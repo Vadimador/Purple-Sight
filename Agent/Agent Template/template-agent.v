@@ -33,8 +33,9 @@ struct Response{
 }
 
 struct SharedVariable {
-	// ==== variable partagés
-	agent_identifier string = "<id-agent>" // de la forme "agent-x" ou x est le numèro de l'agent
+	agent_identifier string = '<!!id-agent!!>' // de la forme "agent-x" ou x est le numèro de l'agent
+
+	number_of_module int = 3
 
     commandes_list []Commande = [
 		<!!commandes!!>
@@ -44,13 +45,12 @@ mut:
 	ip []u8 = [u8(127),0,0,1]
 	response_list []Response
 	module_state shared []ModuleState = [ModuleState.unknown, ModuleState.unknown, ModuleState.unknown]
+	module_state_description shared []string = ['','','']
 }
 
 fn main(){
 	shared shared_variable := SharedVariable{}
-
-	shared_variable.module_ecoute()
-	println("[i] - fin d'éxecution")
+	shared_variable.module_ecoute() // on lance le module écoute
 }
 
 <!!ecoute!!>

