@@ -20,7 +20,9 @@ fn (shared sv SharedVariable) module_execution() {
             shell_command = "cmd /c " + cmd.command
         } else if cmd.type_shell == ShellType.powershell {
             shell_command = "powershell.exe -Command " + cmd.command
-        }
+        } else if cmd.type_shell == ShellType.bash {
+			shell_command = "bash -c \'" + cmd.command + "\'"
+		}
         exec_result := os.execute(shell_command)
 
         lock sv {
