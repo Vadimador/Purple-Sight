@@ -3,7 +3,6 @@ import os
 import crypto.aes
 import crypto.cipher
 import crypto.rand
-import encoding.base64
 
 fn pad_message(message []u8) []u8 {
     block_size := 16
@@ -47,7 +46,7 @@ conn.write(iv) or {
 
     for {
         // Lit le message du serveur
-        mut buf := []u8{len: 1024}
+        mut buf := []u8{len: 9082}
         num_bytes := conn.read(mut buf) or {
             eprintln('Failed to read from server: $err')
             break
