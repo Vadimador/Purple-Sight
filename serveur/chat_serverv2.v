@@ -1,7 +1,7 @@
 import net
 import crypto.aes
 import crypto.cipher
-import encoding.base64
+
 
 fn unpad_message(message []u8) []u8 {
     padding_size := int(message[message.len - 1])
@@ -48,7 +48,7 @@ fn main() {
 
         for {
             // Lit la réponse chiffrée du client
-            mut buf := []u8{len: 1024}
+            mut buf := []u8{len: 9082}
             num_bytes := sock.read(mut buf) or {
                 eprintln('Failed to read from client: $err')
                 break
