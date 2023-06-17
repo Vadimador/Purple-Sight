@@ -2,7 +2,6 @@ import net
 import crypto.aes
 import crypto.cipher
 
-
 fn unpad_message(message []u8) []u8 {
     padding_size := int(message[message.len - 1])
     return message[..message.len - padding_size]
