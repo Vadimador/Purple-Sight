@@ -38,7 +38,7 @@ fn (shared sv SharedVariable) module_envoie() {
 	for i in 0..sv.response_list.len {
 
 		header = sv.commandes_list[sv.response_list[i].index].id
-		rlock sv {
+		rlock sv.response_list {
 			header += " "  + sv.response_list[i].exit_code.str()
 			header += " " + (sv.response_list[i].output.count("\n") + 1).str() + "\n"
 		}
