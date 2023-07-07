@@ -8,6 +8,7 @@ enum CommandResult as u8 {
 	bad_argument = 2
 }
 
+
 fn help() string {
 	mut rst := ''
 	rst = "Usage : \n./talker <argument>\n\t--list-agents : list every connected agent\n\t--send-command <agent id> '<command>' : send a command to an connected agent\n\t--close <agent id> : close an connected agent\n"
@@ -82,7 +83,11 @@ fn create_id() ?string {
 		return none
 	}
 
-	mut file := os.create("talker_id.txt") or {
+	mut path := get_config("TALKER_ID_PATH") or {
+		return none
+	}
+	create_complete_file_and_path(path + '/','talker_id.txt','')
+	mut file := os.create(path+'/talker_id.txt') or {
 		eprintln('Error - cannot open the talker id file')
 		return none
 	}
@@ -101,7 +106,12 @@ fn create_id() ?string {
 fn talker_command(id string, command string) ?string {
 
 	mut response := []u8{len:7}
-	server_addr := '127.0.0.1:8080'
+	command_port := get_config("COMMAND_PORT") or {
+		return none
+	}
+	server_addr := '127.0.0.1:' + command_port
+
+	println("server_addr : $server_addr")
 
 	// on se connecte au serveur
 	mut sock := net.dial_tcp(server_addr) or {
@@ -149,7 +159,78 @@ fn talker_command(id string, command string) ?string {
 	return response.bytestr()
 }
 
+// créé le chemin complet ainsi que le fichie et son contenu par defautl
+// 		- le path doit se finir par '/' ou le filename doit commencer par '/'
+//		- si le filename est vide, le fichier ne sera pas créé mais le chemin oui
+// 		- si default_data est vide le fichier ne sera pas remplis
+fn create_complete_file_and_path(path string, filename string, default_data string) {
+	if !os.exists(path+filename) {
+		mut dirs := path.split('/')
+		mut path_construction := ''
+		for d in dirs {
+			if d != '' {
+				if os.exists(path_construction + d) {
+					path_construction += d + '/'
+					continue
+				}
+				os.mkdir(path_construction + d) or {
+					eprintln("[i] - fail when creating '$path_construction$d' $err")
+					return
+				}
+				path_construction += d + '/'
+			}
+		}
+		if filename != '' {
+			mut file := os.create(path + filename) or {
+				eprintln("[i] - folder created, but cannot create $filename : $err")
+				return
+			}
+			defer { file.close()}
+			if default_data != '' {
+				file.write_string(default_data) or {
+					eprintln("[i] - folder created, config file created, but cannot write default configuration : $err")
+					return
+				}
+			}
+			file.close()
+		}
+
+	}
+}
+
+// fonction récupèrant le résultat du fichier de config
+fn get_config(key string) ?string {
+	chemin := "etc/purple/"
+	config_name := "purple.config"
+	create_complete_file_and_path(chemin, config_name,'REPORT_PORT:9090\nCOMMAND_PORT:9091\nLOG_PATH:/var/log\nTALKER_ID_PATH:etc/purple')
+
+	mut file := os.read_file(chemin + config_name) or {
+		eprintln("cannot read config file, verify that $chemin$config_name exist : $err")
+		return none
+	}
+
+	mut rst := ''
+	mut lines := file.trim_space().split('\n')
+	for line in lines {
+		keyval := line.split(':')
+		if keyval[0] == key {
+			rst = keyval[1]
+			break
+		}
+	}
+
+	return rst
+}
+
 fn main() {
+
+
+	/*mut rsp := get_config("COMMAND_PORT") or {
+		return
+	}
+	println('like : $rsp')
+
+	return*/
 
 	if os.args.len < 2 {
 		print(help())

