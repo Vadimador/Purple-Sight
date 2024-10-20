@@ -1,6 +1,6 @@
 ![PS-github-logo](https://github.com/user-attachments/assets/2e5ea974-087d-4573-ab30-b4eae279cadb)
 # Purple-Sight (Version V0.1)
-**Precius is an OS security tool. (Our school annual Project for 2022-2023)**
+**Purple-Sight is an OS security tool. (Our school annual Project for 2022-2023)**
 
 **Purple-Sight is a web application to generate and control enumeration agents (Windows/Linux). For blue and/or red team. Each agent is fully modular and optimized to meet every need, from internal discrete services enumeration (Red team) to full OS vulnerability scanning (Blue Team).**
 
